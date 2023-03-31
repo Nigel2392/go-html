@@ -2,12 +2,17 @@ package gohtml
 
 import (
 	"fmt"
+	"hash/fnv"
+	"strconv"
 	"strings"
 	"sync"
 )
 
 // Add adds a child to the element.
 func Add[T1, T2 ElementConstraint](elem T1, children ...T2) *Element {
+	if len(children) == 0 {
+		return (*Element)(elem)
+	}
 	var e = (*Element)(elem)
 	var childrenLen = len(e.Children)
 	var newChildren = make([]*Element, len(children)+childrenLen)
@@ -57,6 +62,7 @@ func newElement[T ElementConstraint](t string) *Element {
 	}
 	e.bufLen = len(t) * 2
 	e.bufLen += len("<>\n</>\n")
+	e.Attr("data-attr-id", fmt.Sprintf("%x", fnv.New64a().Sum([]byte(strconv.Itoa(int(e.identifier()))))))
 	return e
 }
 
@@ -122,13 +128,11 @@ func (e *Element) HTML(s string) *Element {
 }
 
 func renderText(e *Element, buf *elementBuffer) {
-	if e.InnerText != "" {
-		for i := 0; i < e.depth; i++ {
-			buf.WriteString("\t")
-		}
-		buf.WriteString(e.InnerText)
-		buf.WriteString("\n")
+	for i := 0; i < e.depth; i++ {
+		buf.WriteString("\t")
 	}
+	buf.WriteString(e.InnerText)
+	buf.WriteString("\n")
 }
 
 func renderElement(e *Element, buf *elementBuffer) {
@@ -318,6 +322,9 @@ func (e *Element) Add(children ...*Element) *Element {
 func (e *Element) String() string {
 	var buf *elementBuffer = NewBuffer(e.bufLen)
 	e.render(buf)
+	if buf.Len() != e.bufLen {
+		panic(fmt.Sprintf("buffer length mismatch: buf.Len() %d != e.bufLen %d", buf.Len(), e.bufLen))
+	}
 	return buf.String()
 }
 
